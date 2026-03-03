@@ -19,7 +19,7 @@ When the user says "repo", "the repo", "read the repo", "save to repo", "update 
 # Okta Bug Bounty -- Claude Code Context
 
 ## Quick Status
-- **Phase:** Initial setup -- no credentials redeemed, no testing started
+- **Phase:** Credentials redeemed -- mandatory setup required (change emails, create admins, configure MFA)
 - **Program:** https://bugcrowd.com/engagements/okta
 - **Platform:** Bugcrowd (Expedited triage)
 - **Ceiling:** $75,000 (OIE / Device Access / Other In-Scope)
@@ -35,10 +35,22 @@ When the user says "repo", "the repo", "read the repo", "save to repo", "update 
 - **Theoretical issues without complete PoC are OUT OF SCOPE**
 - **Must demonstrate real impact, not potential impact**
 
-## Credentials (NOT YET REDEEMED)
-- Bugcrowd provides 2 sets of OIE org credentials
-- Must use @bugcrowdninja.com email
-- After redemption: change emails, create 2+ Super Admins, configure MFA
+## Credentials (Redeemed 2026-03-02)
+
+### Org 1
+- **URL:** https://bugcrowd-pam-4593.oktapreview.com
+- **Username:** bugbounty.okta@gmail.com
+- **Password:** 6KkBNqBWrjvS
+
+### Org 2
+- **URL:** https://bugcrowd-pam-4594.oktapreview.com
+- **Username:** bugbounty.okta@gmail.com
+- **Password:** u1B4rHUI25Ig
+
+### MANDATORY SETUP (do this before any testing)
+1. Change email addresses on both orgs so you control password resets
+2. Create 2+ Super Admins in each org for account recovery
+3. Configure and enforce MFA on both orgs (see SCOPE.md MFA section)
 
 ## Target Priority (by payout ceiling)
 
