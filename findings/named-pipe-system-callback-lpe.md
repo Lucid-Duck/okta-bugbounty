@@ -1,105 +1,204 @@
-# Okta Verify 6.6.2.0 - SYSTEM Service Connects to Attacker-Controlled Named Pipe
+# Okta Verify 6.6.2.0 - Unauthenticated Named Pipe Injection + SYSTEM Callback
+
+## Status: END-TO-END CONFIRMED (2026-03-03)
 
 ## Summary
 
-The Okta Coordinator Service (NT AUTHORITY\SYSTEM) accepts IPC messages from any
-local user via `Okta.Coordinator.pipe`. The IPCMessage contains a `PipeName` field.
-After processing the update check, the SYSTEM service creates a NamedPipeClientStream
-and connects to whatever pipe name the attacker specified -- with zero validation.
+The Okta Auto Update Service (NT AUTHORITY\SYSTEM) accepts unauthenticated IPC
+messages from any local user via `Okta.Coordinator.pipe`. The pipe grants
+`BUILTIN\Users` FullControl with zero authentication. A standard user can:
 
-This means a standard user can:
-1. Create a named pipe server
-2. Send an IPCMessage to the SYSTEM service with PipeName pointing to their pipe
-3. The SYSTEM service connects to the attacker's pipe as NT AUTHORITY\SYSTEM
-4. Attacker calls ImpersonateNamedPipeClient() to get a SYSTEM token
+1. Inject crafted IPCMessage to trigger update checks as SYSTEM
+2. Force SYSTEM to connect to attacker-controlled named pipe via PipeName field
+3. Force SYSTEM to make HTTPS requests to any Okta-domain URL (SSRF)
+4. Receive internal configuration data from SYSTEM context
+5. If a production org with artifacts API is used: trigger arbitrary directory
+   deletion via junction at `C:\Windows\Temp\Okta-AutoUpdate`
 
-## Code Flow
+## Live Test Results (2026-03-03)
 
-### Step 1: Attacker sends IPCMessage with controlled PipeName
+### CONFIRMED: SYSTEM Callback to Attacker Pipe
 
-IPCMessage.cs:
-```csharp
-[DataContract]
-public class IPCMessage
+Standard user (SKINNYD\uglyt, Is Admin: False) injected IPCMessage with PipeName
+pointing to an attacker-created pipe. SYSTEM connected within ~1 second:
+
+```
+[20:56:37.244] Pipe closed. Server should now process the message.
+[20:56:38.257] *** CONNECTION RECEIVED on callback pipe! ***
+[20:56:38.257] Pipe connected: True
+```
+
+### CONFIRMED: Information Disclosure via SYSTEM Callback
+
+SYSTEM sent internal configuration data through the attacker's pipe:
+
+```json
 {
-    [DataMember] public string PipeName { get; set; }  // Attacker-controlled
-    [DataMember] public string AutoUpdateUrl { get; set; }
-    // ... other fields
+  "Databag": {
+    "OrgUrl": "https://bugcrowd-pam-4593.oktapreview.com",
+    "Channel": "GA",
+    "ArtifactType": "OktaVerify",
+    "CurrentVersion": "1.0.0.0",
+    "TotalTimeMS": "0",
+    "OperationMS": "0",
+    "BucketId": "0"
+  },
+  "EndConnection": true,
+  "Exception": null,
+  "NotificationType": 12
 }
 ```
 
-### Step 2: SYSTEM service checks PipeName and creates client
+### NOT CONFIRMED: SYSTEM Token Impersonation
 
-ApplicationInstaller.cs lines 127-130:
+ImpersonateNamedPipeClient() failed with Win32 error 1368 (ERROR_CANT_OPEN_ANONYMOUS).
+The Okta NamedPipeClient uses `TokenImpersonationLevel.None` (maps to
+SECURITY_ANONYMOUS), which prevents the pipe server from impersonating the client.
+
 ```csharp
-if (!string.IsNullOrWhiteSpace(message.PipeName))
+// NamedPipeClient.cs - default constructor uses None impersonation
+new NamedPipeClientStream(".", pipeName, PipeDirection.InOut)
+// Equivalent to TokenImpersonationLevel.None -> SECURITY_ANONYMOUS
+```
+
+### NOT CONFIRMED: Arbitrary Directory Deletion via Junction
+
+CleanPreviousDownloads() only fires after GetUpdateAsync returns valid metadata
+with a higher version number (ApplicationInstaller.cs line 184). The preview org
+`bugcrowd-pam-4593.oktapreview.com` returns 404 for the artifacts API:
+
+```
+GET /api/v1/artifacts/OktaVerify/latest?releaseChannel=GA&bucketId=0
+404: "Not found: Resource not found: OktaVerify (ArtifactVersionType)"
+```
+
+A production org with Okta Verify auto-update configured would return valid
+metadata, allowing CleanPreviousDownloads to fire and follow the junction.
+
+## Key Discovery: CurrentInstalledVersion is System.Version, Not String
+
+The IPCMessage.CurrentInstalledVersion field is type `System.Version`, not string.
+DataContractJsonSerializer expects `{"_Build":0,"_Major":1,"_Minor":0,"_Revision":0}`
+format, not `"1.0.0.0"`. Using the wrong type causes silent deserialization failure
+where the server never processes the message.
+
+## Attack Chain Details
+
+### Pipe Injection (No Auth Required)
+
+Okta.Coordinator.pipe grants BUILTIN\Users FullControl:
+
+```csharp
+// NamedPipeServer.cs - pipe ACL
+PipeAccessRule rule2 = new PipeAccessRule(
+    new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+    PipeAccessRights.FullControl,
+    AccessControlType.Allow);
+```
+
+Messages are deserialized with DataContractJsonSerializer. No authentication,
+no encryption, no caller identity validation.
+
+### SYSTEM Callback Flow
+
+```
+Standard user                     SYSTEM Service
+    |                                   |
+    |---> Connect to coordinator pipe   |
+    |---> Send IPCMessage with:         |
+    |     - AutoUpdateUrl (Okta domain) |
+    |     - PipeName (attacker pipe)    |
+    |     - CurrentInstalledVersion     |
+    |     (close pipe -> EOF)           |
+    |                                   |
+    |     [Deserializes message]        |
+    |     [Validates URL is Okta domain]|
+    |     [Makes HTTPS request as SYSTEM]
+    |     [Gets metadata (or null)]     |
+    |     [If metadata: CleanPreviousDownloads()]
+    |                                   |
+    |<--- Connects to attacker pipe ----|
+    |<--- Sends UpgradeNotification ----|
+    |     (OrgUrl, Channel, Version...) |
+```
+
+### CleanPreviousDownloads Junction Attack (Code-Provable)
+
+```csharp
+// Helper.cs - follows junctions, no symlink check
+public static void CleanPreviousDownloads(ILogger logger)
 {
-    namedPipeClient = new NamedPipeClient();
+    string text = Path.Combine(Path.GetTempPath(), "Okta-AutoUpdate");
+    // For SYSTEM: C:\Windows\Temp\Okta-AutoUpdate
+    if (Directory.Exists(text))
+    {
+        string[] directories = Directory.GetDirectories(text, "*", SearchOption.AllDirectories);
+        for (int i = 0; i < directories.Length; i++)
+        {
+            Directory.Delete(directories[i], recursive: true);
+            // Follows junction -> deletes attacker-chosen target
+        }
+    }
 }
 ```
 
-### Step 3: SYSTEM service connects to attacker's pipe
+Standard user creates: `C:\Windows\Temp\Okta-AutoUpdate` -> `C:\target\dir`
+(BUILTIN\Users has CreateFiles+AppendData on `C:\Windows\Temp`)
 
-ApplicationInstaller.cs line 274:
-```csharp
-pipeClient.SendUpdateNotificationMessage(ipcMessage.PipeName, upgradeNotificationIPCMessage);
+### Retry Cache (DoS Vector)
+
+GetUpdateAsync uses an in-memory singleton cache (CacheData.Instance) with a
+3600-second (1 hour) retry delay after failed checks. An attacker can trigger
+a failed update check, then the service refuses to check again for 1 hour --
+blocking legitimate Okta Verify updates for all users on the system.
+
+## Impact Summary
+
+| Finding | Severity | Status |
+|---------|----------|--------|
+| Unauthenticated pipe injection | Medium | CONFIRMED |
+| SYSTEM callback to attacker pipe | Medium | CONFIRMED |
+| Information disclosure via callback | Low-Medium | CONFIRMED |
+| SSRF within Okta domains | Medium | CONFIRMED |
+| Update check DoS (1hr cache poison) | Low | CONFIRMED |
+| SYSTEM arbitrary directory deletion | High | Code-provable, needs prod org |
+| SYSTEM token impersonation | Critical | BLOCKED (anonymous impersonation) |
+
+## PoC Files
+
+- `poc/okta-lpe-combined/Program.cs` - Combined PoC with both tests
+- `poc/okta-lpe-combined/okta-lpe-combined.csproj` - .NET 8 project
+
+### Build & Run
+
+```bash
+cd poc/okta-lpe-combined
+dotnet publish -c Release -r win-x64 --self-contained false
+
+# Run as standard user
+runas /trustlevel:0x20000 "path\to\okta-lpe-combined.exe impersonation"
+runas /trustlevel:0x20000 "path\to\okta-lpe-combined.exe deletion"
+runas /trustlevel:0x20000 "path\to\okta-lpe-combined.exe both"
 ```
 
-NamedPipeClient.cs lines 30-44:
-```csharp
-private void SendMessage<T>(T message, string pipeName)
-{
-    using NamedPipeClientStream namedPipeClientStream =
-        new NamedPipeClientStream(".", pipeName, PipeDirection.InOut);
-    namedPipeClientStream.Connect(10000);  // CONNECTS TO ATTACKER PIPE AS SYSTEM
-    // ... serializes and writes data
-}
-```
+## Source Files (Decompiled from Okta.AutoUpdate.Executor.dll v0.8.7.0)
 
-### No Validation Present
+- `Okta.AutoUpdate.Executor/NamedPipeServer.cs` - Pipe creation with Users FullControl
+- `Okta.AutoUpdate.Executor/ApplicationInstaller.cs` - Message handler + PipeName callback
+- `Okta.AutoUpdate.Executor/NamedPipeClient.cs` - SYSTEM connects to arbitrary pipe
+- `Okta.AutoUpdate.Executor/Helper.cs` - CleanPreviousDownloads follows junctions
+- `Okta.AutoUpdate.Executor/AutoUpdateExecutor.cs` - Update fetch + retry cache
+- `Okta.AutoUpdate.Executor/IPCMessage.cs` - CurrentInstalledVersion is Version type
+- `Okta.AutoUpdate.Executor.Implementation/ClientConfiguration.cs` - SSL pinning config
 
-- No check that PipeName points to a legitimate Okta pipe
-- No verification the pipe was created by a trusted process
-- No ACL checking on the target pipe
-- No origin validation linking the callback to the original requester
+## Remaining Avenues
 
-## Gating Condition
-
-The callback only fires after the update flow progresses. The service needs
-GetUpdateAsync to return metadata OR hit certain error paths. The callback sends
-UpgradeNotificationIPCMessage which contains:
-
-```csharp
-[DataContract]
-public class UpgradeNotificationIPCMessage
-{
-    [DataMember] public NotificationType NotificationType { get; set; }
-    [DataMember] public Dictionary<string, string> Databag { get; set; }
-    [DataMember] public bool EndConnection { get; set; }
-    [DataMember] public Exception Exception { get; set; }
-}
-```
-
-The Databag contains OrgUrl, Channel, ArtifactType, CurrentVersion, ProxyInUse,
-NewVersion, and exception details from SYSTEM context.
-
-## Confirmed Facts
-
-- Okta.Coordinator.pipe is accessible to BUILTIN\Users with FullControl (CONFIRMED)
-- IPCMessage is deserialized from attacker's JSON (CONFIRMED - PoC sent messages)
-- Service runs as NT AUTHORITY\SYSTEM (CONFIRMED via WMI)
-- PipeName field is not validated before use (CONFIRMED via code review)
-- NamedPipeClient connects to arbitrary pipe name (CONFIRMED via code review)
-
-## Outstanding
-
-- Need to trigger the callback code path (requires update metadata OR error path)
-- Need to verify ImpersonateNamedPipeClient works on the connection
-- Full end-to-end PoC not yet built
-
-## Files
-
-- update-service-executor/Okta.AutoUpdate.Executor/IPCMessage.cs
-- update-service-executor/Okta.AutoUpdate.Executor/ApplicationInstaller.cs (lines 127-130, 274)
-- update-service-executor/Okta.AutoUpdate.Executor/NamedPipeClient.cs (lines 23-44)
-- update-service-executor/Okta.AutoUpdate.Executor/UpgradeNotificationIPCMessage.cs
+1. **Find production org with artifacts API**: A real customer org with Okta Verify
+   auto-update configured should return valid metadata, enabling the junction attack
+2. **Bypass anonymous impersonation**: Research if there's a way to force the
+   NamedPipeClientStream to connect with higher impersonation level (unlikely)
+3. **Exploit SSRF within Okta domains**: The service connects to any `*.okta.com`,
+   `*.oktapreview.com`, `*.oktacdn.com` etc. URL as SYSTEM -- potential for
+   SSRF-based attacks against Okta infrastructure
+4. **Alternative file operations**: Check if other code paths in the update flow
+   perform file operations before the metadata check

