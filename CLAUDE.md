@@ -66,6 +66,7 @@ When the user says "repo", "the repo", "read the repo", "save to repo", "update 
 2. Create 2+ Super Admins in each org for account recovery
 3. Configure and enforce MFA on both orgs (see SCOPE.md MFA section)
 
+## Windows 10 Test VM -- "Sophos-Lab" on Hyper-V**For testing LPE PoCs that need Windows 10** (junction attacks blocked on Win11 SystemTemp).- **Hyper-V VM name:** `Sophos-Lab`- **OS:** Windows 10 Pro- **Username:** `lucid-duck-win10-vm`- **Password:** `Password1`- **Start:** `Start-VM -Name "Sophos-Lab"`- **PowerShell Direct:**  ```  $cred = New-Object PSCredential("lucid-duck-win10-vm", (ConvertTo-SecureString "Password1" -AsPlainText -Force))  Invoke-Command -VMName "Sophos-Lab" -Credential $cred -ScriptBlock { whoami }  ```- On Win10, SYSTEM temp = `C:WindowsTemp` (standard users CAN create junctions here)- On Win11, SYSTEM temp = `C:WINDOWSSystemTemp` (locked to SYSTEM+Admins)
 ## Target Priority (by payout ceiling)
 
 | Target | P1 Ceiling | RE Surface |
