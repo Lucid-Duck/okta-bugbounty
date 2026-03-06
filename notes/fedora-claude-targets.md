@@ -1,67 +1,45 @@
 # Linux + Android Attack Surface for Fedora Claude
 
 **Date:** 2026-03-05
+**Updated:** 2026-03-06
 **Purpose:** Give Fedora Claude a target to work on
 
 ---
 
-## Option 1: Advanced Server Access (ASA / ScaleFT) -- Linux Native, $35K P1
+## Option 1: Advanced Server Access (ASA / ScaleFT) -- COMPLETED RE, BLOCKED ON ENROLLMENT
 
-### What It Is
+### Status: RE DONE, runtime PoC BLOCKED
 
-Okta's SSH replacement. A root-level daemon (`sftd`) runs on Linux servers, handles certificate-based SSH auth, manages local user accounts, and audits logins. The client (`sft`) replaces the SSH command. Both are native Linux binaries -- perfect for RE on Fedora.
+**Findings:** 8 findings documented in `findings/sftd-re-security-findings.md`
+**Technical notes:** `notes/sftd-binary-analysis-notes.md`
+**Dead end details:** `notes/pam-setup-dead-end.md`
 
-**Being sunset May 2026 but still in scope RIGHT NOW.**
+### What Was Done
+- Installed sftd v1.100.2 and sft v1.100.2 from direct RPM download
+  - dnf repo was broken (XML parsing failure), downloaded from `https://dist.scaleft.com/repos/rpm/stable/rhel/9/x86_64/1.100.2/`
+- Complete RE of sftd using `go tool objdump` + DWARF debug info
+- Binary is Go 1.25.0, NOT STRIPPED, full symbols + source paths
+- Mapped all osedit/actions functions, confirmed shell-out pattern (useradd/userdel via exec.CommandContext)
+- **Key finding: Fchownat called with flags=0 (follows symlinks) as root** -- confirmed in disassembly
 
-### Account Setup
+### What's Blocked
+- **ScaleFT standalone signup is DEAD** -- `app.scaleft.com/p/signup` redirects to 404
+- **PAM provisioning is DISABLED** on preview orgs -- cannot be enabled via API or UI
+- Without enrollment, cannot trigger user management operations to prove symlink race
 
-1. Go to `https://app.scaleft.com/p/signup`
-2. Team name: use `bugcrowd-lucidduck` (or similar bugcrowd-username pattern)
-3. Email: use `@bugcrowdninja.com` email
-4. No credit card needed
-
-### Install on Fedora
+### Install Notes (for reference)
 
 ```bash
-# Import GPG key
-sudo rpm --import https://dist.scaleft.com/GPG-KEY-OktaPAM-2023
-
-# Client (sft -- SSH replacement CLI, user-level)
-sudo dnf install scaleft-client-tools
-
-# Server agent (sftd -- root daemon, the main RE target)
-sudo dnf install scaleft-server-tools
+# dnf repos are BROKEN. Download RPMs directly:
+wget https://dist.scaleft.com/repos/rpm/stable/rhel/9/x86_64/1.100.2/scaleft-server-tools-1.100.2-1.x86_64.rpm
+wget https://dist.scaleft.com/repos/rpm/stable/rhel/9/x86_64/1.100.2/scaleft-client-tools-1.100.2-1.x86_64.rpm
+sudo rpm -i scaleft-server-tools-1.100.2-1.x86_64.rpm
+sudo rpm -i scaleft-client-tools-1.100.2-1.x86_64.rpm
 ```
-
-### RE Targets
-
-| Binary | Runs As | Purpose | Notes |
-|--------|---------|---------|-------|
-| `sft` | User | SSH client replacement | Handles auth flows, certificate management |
-| `sftd` | **root** | Server agent daemon | Creates local users, manages certs, audits logins |
-
-### What to Look For
-
-Same patterns that produced results on Windows Okta Verify:
-- **IPC mechanisms** -- how do sft and sftd communicate? Unix sockets? Named pipes? D-Bus?
-- **File operations as root** -- does sftd write to predictable paths? Symlink/junction attacks?
-- **Certificate handling** -- key storage, validation, can certs be forged or replayed?
-- **Local user management** -- sftd creates/removes local Linux accounts. Race conditions? Privilege issues?
-- **Auth protocol** -- how does the challenge-response work? Can it be relayed?
-- **Update mechanism** -- does it auto-update? As root? TOCTOU?
-- **Config file permissions** -- who can read/write sftd config?
-- **Enrollment token** -- how is the server enrolled? Can enrollment be hijacked?
-
-### Docs
-
-- Install client: https://help.okta.com/asa/en-us/content/topics/adv_server_access/docs/sft-redhat.htm
-- Install agent: https://help.okta.com/asa/en-us/Content/Topics/Adv_Server_Access/docs/sftd-redhat.htm
-- Getting started: https://help.okta.com/asa/en-us/content/topics/adv_server_access/docs/setup/getting-started.htm
-- Client usage: https://help.okta.com/asa/en-us/content/topics/adv_server_access/docs/client.htm
 
 ---
 
-## Option 2: Okta Verify Android -- $75K P1
+## Option 2: Okta Verify Android -- $75K P1 -- RECOMMENDED NEXT
 
 ### What It Is
 
@@ -88,22 +66,44 @@ The Android version of the same app we've been reversing on Windows. Handles Fas
 
 ---
 
-## Option 3: Okta Privileged Access (PAM) Server Agent -- Linux Native, $35K P1
+## Option 3: Okta Privileged Access (PAM) Server Agent -- BLOCKED (same as Option 1)
 
-### What It Is
-
-The successor to ASA. PAM server agents also run on Linux. Uses the existing preview orgs (bugcrowd-pam-4593/4594). This is the future-proof option since ASA is being sunset.
-
-### Setup
-
-- Access via Admin Dashboard > Applications > Browse App Catalog > "Okta Privileged Access"
-- Team name: bugcrowd-pam-4593 (matches the org)
-- Server agent install docs: https://help.okta.com/oie/en-us/content/topics/privileged-access/tool-setup/pam-sftd-redhat.htm
+PAM uses the same sftd binary. Provisioning is disabled on preview orgs. Same dead end as Option 1. See `notes/pam-setup-dead-end.md`.
 
 ---
 
-## Recommendation
+## Option 4: OIE API Testing -- $75K P1 -- READY NOW
 
-**Start with ASA (Option 1).** It's the most straightforward -- standalone signup, no dependencies on the preview org config, native Linux binaries running as root. The attack surface is clear: reverse `sftd`, find the same class of bugs we found in the Windows auto-update service (IPC injection, file operation races, auth protocol flaws).
+No binary RE needed. We have a working Super Admin SSWS token and full API access.
 
-If ASA feels too small or dead-end, pivot to the Android Okta Verify app (Option 2) which has the $75K ceiling and is the same product family where we already have 13+ findings on Windows.
+### Focus Areas
+- OAuth/OIDC/SAML protocol vulnerabilities
+- Expression Language injection in user profile attributes
+- Cross-org / multi-tenancy issues
+- Privilege escalation (horizontal/vertical)
+- Workflow sandbox escape (SSRF via Flo cards)
+
+### What's Already Set Up
+- SSWS token verified working
+- API enumeration done (see `recon/api-enumeration-org1.md`)
+- Test OIDC app created (0oavvphi56SbYPzXk1d7)
+- PAM app created (0oavvpaf5nqmwxJlY1d7) -- useful for OIDC testing even if PAM backend is dead
+
+---
+
+## Option 5: Auth0 -- $50K P1 -- READY NOW
+
+Separate Bugcrowd program, 3 tenants with credentials. Higher average payout ($3,808 vs $2,686).
+
+See `auth0/SCOPE.md` for full details.
+
+---
+
+## Recommendation (Updated 2026-03-06)
+
+~~Start with ASA (Option 1).~~ ASA RE is done but enrollment is blocked.
+
+**Best next targets:**
+1. **OIE API (Option 4)** -- highest ceiling ($75K), ready now, no setup needed
+2. **Auth0 (Option 5)** -- highest avg payout, 3 tenants, FGA is interesting
+3. **Okta Verify Android (Option 2)** -- $75K ceiling, same product family as Windows findings, needs emulator setup
