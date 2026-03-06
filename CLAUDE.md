@@ -1,3 +1,17 @@
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# >>> OKTA API TOKEN -- USE THIS FOR ALL API CALLS <<<
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#
+# TOKEN: 00B_hG_7HZJaM145T6LL1QGBkLrDXDJoaqPLk4yQ53
+#
+# Usage:
+#   curl -H "Authorization: SSWS 00B_hG_7HZJaM145T6LL1QGBkLrDXDJoaqPLk4yQ53" \
+#     "https://bugcrowd-pam-4593.oktapreview.com/api/v1/users/me"
+#
+# This is a Super Admin SSWS token for Org 1 (bugcrowd-pam-4593).
+# It works with ALL /api/v1/ endpoints. Use it. It's right here.
+#
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ## MANDATORY: NO EM DASHES. EVER. ANYWHERE.
 
 **NEVER use em dashes (the long dash character).** Use regular hyphens (-), double hyphens (--), commas, or rephrase instead. This applies to ALL output. No exceptions.
