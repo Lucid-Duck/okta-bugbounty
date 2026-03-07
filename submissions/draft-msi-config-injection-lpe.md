@@ -149,6 +149,25 @@ BUILTIN\Users : CreateFiles, AppendData, ExecuteFile, Synchronize (Allow)
 Junction created for C:\Windows\Temp\WOV_junc_2943adb1 <<===>> target
 ```
 
+**TOCTOU race reliability (10 test runs with cleanup between each):**
+
+The FileSystemWatcher consistently detects and swaps the config in ~60ms. The real MSI gap between BackupData (seq 1401) and RestoreData (seq 4001) spans 3-10+ seconds of MSI file operations, giving 50-150x more time than the watcher needs.
+
+```
+Run  1: PASS -- Watcher=True, Swap=True, Gap=63ms
+Run  2: PASS -- Watcher=True, Swap=True, Gap=64ms
+Run  3: PASS -- Watcher=True, Swap=True, Gap=65ms
+Run  4: PASS -- Watcher=True, Swap=True, Gap=64ms
+Run  5: PASS -- Watcher=True, Swap=True, Gap=64ms
+Run  6: PASS -- Watcher=True, Swap=True, Gap=60ms
+Run  7: PASS -- Watcher=True, Swap=True, Gap=65ms
+Run  8: PASS -- Watcher=True, Swap=True, Gap=60ms
+Run  9: PASS -- Watcher=True, Swap=True, Gap=64ms
+Run 10: PASS -- Watcher=True, Swap=True, Gap=64ms
+
+Success rate: 10/10 (100%)
+```
+
 ### Impact
 
 - Any standard Windows user can achieve NT AUTHORITY\SYSTEM code execution on machines running Okta Verify
