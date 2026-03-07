@@ -149,21 +149,21 @@ BUILTIN\Users : CreateFiles, AppendData, ExecuteFile, Synchronize (Allow)
 Junction created for C:\Windows\Temp\WOV_junc_2943adb1 <<===>> target
 ```
 
-**TOCTOU race reliability (10 test runs with cleanup between each):**
+**TOCTOU race reliability (10 runs against real MSI custom actions with full cleanup between each):**
 
-The FileSystemWatcher consistently detects and swaps the config in ~60ms. The real MSI gap between BackupData (seq 1401) and RestoreData (seq 4001) spans 3-10+ seconds of MSI file operations, giving 50-150x more time than the watcher needs.
+Each run triggers the actual BackupData and RestoreData custom actions via `msiexec /i` with `WIX_UPGRADE_DETECTED`. The FileSystemWatcher detects BackupData's write and swaps the config in 61-77ms. RestoreData then copies the attacker's config to `C:\Program Files\Okta\UpdateService\`. Malicious config confirmed in Program Files on every run.
 
 ```
-Run  1: PASS -- Watcher=True, Swap=True, Gap=63ms
-Run  2: PASS -- Watcher=True, Swap=True, Gap=64ms
-Run  3: PASS -- Watcher=True, Swap=True, Gap=65ms
-Run  4: PASS -- Watcher=True, Swap=True, Gap=64ms
-Run  5: PASS -- Watcher=True, Swap=True, Gap=64ms
-Run  6: PASS -- Watcher=True, Swap=True, Gap=60ms
-Run  7: PASS -- Watcher=True, Swap=True, Gap=65ms
-Run  8: PASS -- Watcher=True, Swap=True, Gap=60ms
-Run  9: PASS -- Watcher=True, Swap=True, Gap=64ms
-Run 10: PASS -- Watcher=True, Swap=True, Gap=64ms
+Run  1: PASS -- Swap in 64ms, malicious config in Program Files (total 2797ms)
+Run  2: PASS -- Swap in 70ms, malicious config in Program Files (total 2803ms)
+Run  3: PASS -- Swap in 65ms, malicious config in Program Files (total 2812ms)
+Run  4: PASS -- Swap in 77ms, malicious config in Program Files (total 2768ms)
+Run  5: PASS -- Swap in 68ms, malicious config in Program Files (total 2786ms)
+Run  6: PASS -- Swap in 66ms, malicious config in Program Files (total 2783ms)
+Run  7: PASS -- Swap in 64ms, malicious config in Program Files (total 2773ms)
+Run  8: PASS -- Swap in 61ms, malicious config in Program Files (total 2782ms)
+Run  9: PASS -- Swap in 64ms, malicious config in Program Files (total 2793ms)
+Run 10: PASS -- Swap in 72ms, malicious config in Program Files (total 2787ms)
 
 Success rate: 10/10 (100%)
 ```
