@@ -2,7 +2,33 @@
 
 ## Session Summary
 
-This session continued from a previous crashed session. Primary work: testing the junction-based LPE on a Win10 Hyper-V VM, then pivoting to FastPass CORS attack chain research.
+Multiple sessions on this date. Early session: junction LPE on Win10 VM + FastPass CORS research.
+Late session: **BREAKTHROUGH** -- full auto-update download + execution chain proven end-to-end.
+
+## Late Session - Auto-Update Chain Breakthrough
+
+After extensive debugging across multiple context compactions, finally got the full chain working:
+
+### Problem: Silent Failures Everywhere
+- `ArtifactType: "OktaVerify"` -- API returns 404 (correct: `WINDOWS_OKTA_VERIFY`)
+- `AutoUpdateUrl` without trailing slash -- string concat produces malformed URL
+- `BucketId: "1"` -- gradual rollout, only bucket 0 returns 200 on preview orgs
+- All failures logged at Debug level, filtered by Info log level config -- completely silent
+- OktaVerify GUI consumes the single pipe instance (maxNumberOfServerInstances=1)
+- 1-hour retry cache after ANY API call (even failures)
+
+### Solution: Correct Parameters
+```json
+{"ArtifactType":"WINDOWS_OKTA_VERIFY","AutoUpdateUrl":"https://bugcrowd-pam-4593.oktapreview.com/","BucketId":"0","CurrentInstalledVersion":{"_Build":0,"_Major":1,"_Minor":0,"_Revision":0},"EventLogName":"Okta Verify","EventSourceName":"OktaUpdate","PipeName":"","ReleaseChannel":"GA","UserId":null}
+```
+
+### Result
+SYSTEM downloaded OktaVerifySetup-6.7.1.0-15309a5.exe (36.2 MB), validated signature, executed it.
+OktaVerify upgraded from 6.6.2 to 6.7.1. All triggered by a standard user pipe message.
+
+## Early Session Summary
+
+Testing the junction-based LPE on Win10 VM, then pivoting to FastPass CORS attack chain research.
 
 ## Credentials & Access
 
