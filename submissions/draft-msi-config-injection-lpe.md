@@ -16,15 +16,15 @@ Okta Verify (Windows)
 
 ## VRT CATEGORY [FORM]
 
-Insecure OS/Firmware > Local Administrator on default environment
+Insecure OS/Firmware > Command Injection
 
-> Auto-populates P2. Standard user achieves NT AUTHORITY\SYSTEM code execution
-> via insecure MSI custom actions that backup/restore a SYSTEM service config
-> through a world-writable temp directory (C:\Windows\Temp). NTFS junction
-> redirection + TOCTOU race between backup (seq 1401) and restore (seq 4001)
-> allows config swap. The Okta Coordinator Service then loads attacker code
-> as SYSTEM. No admin privileges required. Auto-update trigger means no user
-> interaction needed.
+> Auto-populates P1. Researcher believes actual severity is P2 (local
+> privilege escalation, not remote). No P2 VRT category exists for local
+> privilege escalation, so the closest accurate description was chosen.
+> A standard user injects a malicious .NET config into a SYSTEM service
+> via TOCTOU race + NTFS junction in the MSI installer's backup/restore
+> custom actions. The service then executes attacker-controlled code as
+> NT AUTHORITY\SYSTEM.
 
 ## URL / LOCATION [FORM]
 
@@ -33,6 +33,10 @@ OktaVerify-x64.msi v6.7.1.0 -- OktaVerifyInstaller.CustomActions.dll (embedded i
 ---
 
 # DESCRIPTION
+
+### Severity Note
+
+The VRT category "Insecure OS/Firmware > Command Injection" auto-populates P1. This finding is a local privilege escalation (standard user to SYSTEM), which the researcher believes warrants P2. However, no P2 category in the current VRT accurately describes local privilege escalation, so the closest matching category was selected. The attack requires local access and a standard user account on a machine running Okta Verify.
 
 ### What is Broken
 
@@ -191,7 +195,7 @@ See attached technical writeup and PoC scripts for full decompilation analysis a
 - [x] **Researcher handle:** Lucid_Duck (in BUGCROWD headers of PoC).
 - [x] **Title:** Under 80 chars. States the one bug as a consequence.
 - [x] **Target:** "Okta Verify (Windows)" -- exact match from scope (Other In-Scope Targets).
-- [x] **VRT:** Verified against VRT-OFFICIAL-TAXONOMY.md. "Insecure OS/Firmware > Local Administrator on default environment" auto-populates P2. Standard user to SYSTEM -- matches P2 severity.
+- [x] **VRT:** Verified against VRT-OFFICIAL-TAXONOMY.md. "Insecure OS/Firmware > Command Injection" auto-populates P1. No P2 LPE category exists in VRT. Severity note in description body explains researcher assessment of P2.
 - [x] **URL:** Identifies the specific MSI and DLL.
 - [x] **CVE precedent:** Omitted (no exact match for MSI custom action TOCTOU with junction + .NET config injection).
 - [x] **CWE:** CWE-367 (TOCTOU) and CWE-59 (Link Following) are exact matches.
